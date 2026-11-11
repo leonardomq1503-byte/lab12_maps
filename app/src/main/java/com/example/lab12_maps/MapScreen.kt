@@ -16,9 +16,18 @@ import com.google.android.gms.maps.model.CameraPosition
 
 @Composable
 fun MapScreen() {
-    val ArequipaLocation = LatLng(-16.4040102, -71.559611)
+    val arequipaLocation = LatLng(-16.4040102, -71.559611)
+
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(ArequipaLocation, 12f)
+        position = CameraPosition.fromLatLngZoom(arequipaLocation, 12f)
+    }
+
+    val locations = remember {
+        listOf(
+            LatLng(-16.433415, -71.5442652),  // JLByR
+            LatLng(-16.4205151, -71.4945209), // Paucarpata
+            LatLng(-16.3524187, -71.5675994)  // Zamacola
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -27,10 +36,18 @@ fun MapScreen() {
             cameraPositionState = cameraPositionState
         ) {
             Marker(
-                state = rememberMarkerState(position = ArequipaLocation),
+                state = rememberMarkerState(position = arequipaLocation),
                 icon = BitmapDescriptorFactory.fromResource(R.drawable.arequipaicon),
                 title = "Arequipa, Perú"
             )
+
+            locations.forEach { location ->
+                Marker(
+                    state = rememberMarkerState(key = location.toString(), position = location),
+                    title = "Ubicación",
+                    snippet = "Punto de interés"
+                )
+            }
         }
     }
 }

@@ -1,5 +1,10 @@
 package com.example.lab12_maps
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -16,7 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -24,6 +32,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
+import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polygon
 import com.google.maps.android.compose.rememberCameraPositionState
@@ -31,6 +40,7 @@ import com.google.maps.android.compose.rememberMarkerState
 
 @Composable
 fun MapScreen() {
+    val context = LocalContext.current
     val arequipaLocation = LatLng(-16.4040102, -71.559611)
 
     val cameraPositionState = rememberCameraPositionState {
@@ -39,18 +49,44 @@ fun MapScreen() {
 
     var mapType by remember { mutableStateOf(MapType.NORMAL) }
 
-    LaunchedEffect(Unit) {
-        cameraPositionState.animate(
-            update = CameraUpdateFactory.newLatLngZoom(LatLng(-16.2520984, -71.6836503), 12f),
-            durationMs = 3000
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
         )
+    }
+
+    val fusedLocationClient = remember {
+        LocationServices.getFusedLocationProviderClient(context)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasLocationPermission = isGranted
+        if (isGranted) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let {
+                    val userLatLng = LatLng(it.latitude, it.longitude)
+                    cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(userLatLng, 15f))
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasLocationPermission) {
+            permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
     }
 
     val locations = remember {
         listOf(
-            LatLng(-16.433415, -71.5442652),  // JLByR
-            LatLng(-16.4205151, -71.4945209), // Paucarpata
-            LatLng(-16.3524187, -71.5675994)  // Zamacola
+            LatLng(-16.433415, -71.5442652),
+            LatLng(-16.4205151, -71.4945209),
+            LatLng(-16.3524187, -71.5675994)
         )
     }
 
@@ -63,32 +99,20 @@ fun MapScreen() {
         )
     }
 
-    val unsaPolygon = remember {
-        listOf(
-            LatLng(-16.406000, -71.527000),
-            LatLng(-16.406000, -71.522000),
-            LatLng(-16.411000, -71.522000),
-            LatLng(-16.411000, -71.527000)
-        )
-    }
-
-    val aeropuertoPolygon = remember {
-        listOf(
-            LatLng(-16.345000, -71.580000),
-            LatLng(-16.338000, -71.568000),
-            LatLng(-16.344000, -71.562000),
-            LatLng(-16.351000, -71.574000)
-        )
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
 
-            properties = MapProperties(mapType = mapType)
-        ) {
+            properties = MapProperties(
+                mapType = mapType,
+                isMyLocationEnabled = hasLocationPermission
+            ),
 
+            uiSettings = MapUiSettings(
+                myLocationButtonEnabled = true
+            )
+        ) {
             Marker(
                 state = rememberMarkerState(position = arequipaLocation),
                 icon = BitmapDescriptorFactory.fromResource(R.drawable.arequipaicon),
@@ -109,20 +133,6 @@ fun MapScreen() {
                 fillColor = Color(0x664CAF50),
                 strokeWidth = 4f
             )
-
-            Polygon(
-                points = unsaPolygon,
-                strokeColor = Color(0xFF1565C0),
-                fillColor = Color(0x662196F3),
-                strokeWidth = 5f
-            )
-
-            Polygon(
-                points = aeropuertoPolygon,
-                strokeColor = Color(0xFFE65100),
-                fillColor = Color(0x66FF9800),
-                strokeWidth = 6f
-            )
         }
 
         Row(
@@ -131,15 +141,9 @@ fun MapScreen() {
                 .padding(top = 16.dp, start = 8.dp, end = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Button(onClick = { mapType = MapType.NORMAL }) {
-                Text("Normal")
-            }
-            Button(onClick = { mapType = MapType.TERRAIN }) {
-                Text("Terreno")
-            }
-            Button(onClick = { mapType = MapType.SATELLITE }) {
-                Text("Satelital")
-            }
+            Button(onClick = { mapType = MapType.NORMAL }) { Text("Normal") }
+            Button(onClick = { mapType = MapType.TERRAIN }) { Text("Terreno") }
+            Button(onClick = { mapType = MapType.SATELLITE }) { Text("Satelital") }
         }
     }
 }
